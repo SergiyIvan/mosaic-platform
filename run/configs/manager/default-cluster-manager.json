@@ -1,7 +1,0 @@
-{
-  "workers": "127.0.0.1",
-  "managerState": {
-    "scheduler": "org.graalvm.argo.cluster_manager.schedulers.SingleWorkerScheduler",
-    "storage": "org.graalvm.argo.cluster_manager.function_storage.SingleWorkerFunctionStorage"
-  }
-}

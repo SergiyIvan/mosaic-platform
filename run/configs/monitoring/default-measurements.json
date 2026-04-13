@@ -1,7 +1,0 @@
-{
-    "influxdb_url": "http://localhost:8086",
-    "influxdb_token": "",
-    "influxdb_org": "argo",
-    "influxdb_bucket": "serverless",
-    "interval": 10
-}

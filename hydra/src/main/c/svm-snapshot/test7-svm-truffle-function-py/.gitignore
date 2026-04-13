@@ -1,7 +1,0 @@
-.gradle
-build
-sources
-resources
-/*.h
-/*.debug
-/*.so

@@ -1,6 +1,0 @@
-[submodule "benchmarks"]
-	path = benchmarks
-	url = git@github.com:graalvm-argo/benchmarks.git
-[submodule "scheduler"]
-	path = scheduler
-	url = git@github.com:arg-inescid/hydra-scheduler.git

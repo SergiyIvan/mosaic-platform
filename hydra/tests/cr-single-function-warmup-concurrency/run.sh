@@ -1,1 +1,0 @@
-../cr-single-function/run.sh

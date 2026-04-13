@@ -1,6 +1,6 @@
 # Node Manager
 
-The node manager is part of the Hydra platform. It is expected to run on a local node and manage Hydra runtime instances (as well as other runtimes integrated into node manager, such as OpenWhisk and Knative).
+The node manager is part of the Mosaic platform. It is expected to run on a local node and manage Mosaic runtime instances (as well as other runtimes integrated into node manager).
 
 ### Node manager API
 
@@ -21,4 +21,4 @@ Run the `build.sh` script to build the node manager.
 
 Run the `deploy.sh` script to deploy the node manager locally. Run the script with the `-h` or `--help` option to get usage instructions.
 
-The easiest way to get started with the node manager is to inspect and run one of the simple [tests](tests) - for example, [`hy-hello-world`](tests/hy-hello-world). These tests were created to test the node manager but they can also guide you through the deployment process of the node manager as they contain example commands to deploy the node manager, upload functions, invoke them, and terminate the deployment.
+The easiest way to get started with the node manager is to inspect and run one of the simple [tests](tests). These tests were created to test the node manager but they can also guide you through the deployment process of the node manager as they contain example commands to deploy the node manager, upload functions, invoke them, and terminate the deployment.
