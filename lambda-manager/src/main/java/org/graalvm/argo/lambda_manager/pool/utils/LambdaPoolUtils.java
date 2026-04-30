@@ -1,7 +1,6 @@
 package org.graalvm.argo.lambda_manager.pool.utils;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -19,35 +18,26 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 import org.graalvm.argo.lambda_manager.core.*;
-import org.graalvm.argo.lambda_manager.optimizers.LambdaExecutionMode;
+import org.graalvm.argo.lambda_manager.core.LambdaExecutionMode;
 import org.graalvm.argo.lambda_manager.processes.ProcessBuilder;
 import org.graalvm.argo.lambda_manager.processes.lambda.DefaultLambdaShutdownHandler;
 import org.graalvm.argo.lambda_manager.processes.lambda.StartLambda;
 import org.graalvm.argo.lambda_manager.utils.LambdaConnection;
-import org.graalvm.argo.lambda_manager.utils.Messages;
-import org.graalvm.argo.lambda_manager.utils.NetworkConfigurationUtils;
 import org.graalvm.argo.lambda_manager.utils.logger.Logger;
 import org.graalvm.argo.lambda_manager.utils.parser.LambdaManagerPool;
 
 // TODO (rbruno): this class should be merged with LambdaPool.
 public class LambdaPoolUtils {
 
-    private static final Set<Lambda> startingLambdas = Collections.newSetFromMap(new ConcurrentHashMap<Lambda, Boolean>());
+    private static final Set<Lambda> startingLambdas = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     public static final int EXECUTOR_THREAD_COUNT = Runtime.getRuntime().availableProcessors() / 2;
 
     public static void prepareLambdaPool(Map<String, ConcurrentLinkedQueue<Lambda>> lambdaPool, LambdaManagerPool poolConfiguration) {
         ExecutorService executor = Executors.newFixedThreadPool(EXECUTOR_THREAD_COUNT);
 
-        startLambdasPerMode(lambdaPool, LambdaExecutionMode.HOTSPOT_W_AGENT, poolConfiguration.getHotspotWithAgent(), executor);
-        startLambdasPerMode(lambdaPool, LambdaExecutionMode.HOTSPOT, poolConfiguration.getHotspot(), executor);
-        startLambdasPerMode(lambdaPool, LambdaExecutionMode.HYDRA, poolConfiguration.getHydra(), executor);
-        startLambdasPerMode(lambdaPool, LambdaExecutionMode.GRAALOS, poolConfiguration.getGraalOS(), executor);
-        startLambdasPerMode(lambdaPool, LambdaExecutionMode.CUSTOM_JAVA, poolConfiguration.getCustomJava(), executor);
-        startLambdasPerMode(lambdaPool, LambdaExecutionMode.CUSTOM_JAVASCRIPT, poolConfiguration.getCustomJavaScript(), executor);
-        startLambdasPerMode(lambdaPool, LambdaExecutionMode.CUSTOM_PYTHON, poolConfiguration.getCustomPython(), executor);
-        startLambdasPerMode(lambdaPool, LambdaExecutionMode.HYDRA_PGO, poolConfiguration.getHydraPgo(), executor);
-        startLambdasPerMode(lambdaPool, LambdaExecutionMode.HYDRA_PGO_OPTIMIZED, poolConfiguration.getHydraPgoOptimized(), executor);
+        startLambdasPerMode(lambdaPool, LambdaExecutionMode.MOSAIC, poolConfiguration.getMosaic(), executor);
+        startLambdasPerMode(lambdaPool, LambdaExecutionMode.NATIVE, poolConfiguration.getNative(), executor);
         executor.shutdown();
         try {
             if (!executor.awaitTermination(600, TimeUnit.SECONDS)) {
@@ -74,9 +64,6 @@ public class LambdaPoolUtils {
             long timeBefore = System.currentTimeMillis();
             LambdaConnection connection = Configuration.argumentStorage.getLambdaPool().nextLambdaConnection();
             lambda.setConnection(connection);
-            if (Configuration.argumentStorage.getLambdaType().isVM()) {
-                NetworkConfigurationUtils.createTap(connection.tap);
-            }
             Logger.log(Level.INFO, "Starting new " + targetMode + " lambda.");
             ProcessBuilder process = whomToSpawn(lambda, targetMode, function).build();
             process.start();
@@ -99,24 +86,10 @@ public class LambdaPoolUtils {
 
     private static StartLambda whomToSpawn(Lambda lambda, LambdaExecutionMode targetMode, Function function) {
         switch (targetMode) {
-            case HOTSPOT_W_AGENT:
-                return Configuration.argumentStorage.getLambdaFactory().createHotspotWithAgent(lambda);
-            case HOTSPOT:
-                return Configuration.argumentStorage.getLambdaFactory().createHotspot(lambda);
-            case HYDRA:
-                return Configuration.argumentStorage.getLambdaFactory().createHydra(lambda);
-            case HYDRA_PGO:
-                return Configuration.argumentStorage.getLambdaFactory().createHydraPgo(lambda);
-            case HYDRA_PGO_OPTIMIZED:
-                return Configuration.argumentStorage.getLambdaFactory().createHydraPgoOptimized(lambda);
-            case GRAALOS:
-                return Configuration.argumentStorage.getLambdaFactory().createGraalOS(lambda);
-            case CUSTOM_JAVA:
-            case CUSTOM_JAVASCRIPT:
-            case CUSTOM_PYTHON:
-                return Configuration.argumentStorage.getLambdaFactory().createOpenWhisk(lambda, function);
-            case KNATIVE:
-                return Configuration.argumentStorage.getLambdaFactory().createKnative(lambda, function);
+            case MOSAIC:
+                return Configuration.argumentStorage.getLambdaFactory().createMosaic(lambda, function);
+            case NATIVE:
+                return Configuration.argumentStorage.getLambdaFactory().createNative(lambda, function);
             default:
                 throw new IllegalStateException("Unexpected value: " + targetMode);
         }
@@ -149,11 +122,7 @@ public class LambdaPoolUtils {
         boolean success;
         try {
             if (lambdaType == LambdaType.CONTAINER || lambdaType == LambdaType.CONTAINER_DEBUG) {
-                success = shutdownContainerLambda(lambda, Environment.CODEBASE + "/" + lambda.getLambdaName());
-            } else if (lambdaType == LambdaType.VM_FIRECRACKER || lambdaType == LambdaType.VM_FIRECRACKER_SNAPSHOT) {
-                success = shutdownFirecrackerLambda(lambda, Environment.CODEBASE + "/" + lambda.getLambdaName(), lambdaType);
-            } else if (lambdaType == LambdaType.GRAALOS_NATIVE) {
-                success = shutdownNativeLambda(lambda, Environment.CODEBASE + "/" + lambda.getLambdaName());
+                success = shutdownContainerLambda(lambda);
             } else {
                 Logger.log(Level.WARNING, String.format("Lambda ID=%d has no known execution mode: %s", lambda.getLambdaID(), lambda.getExecutionMode()));
                 success = false;
@@ -164,13 +133,6 @@ public class LambdaPoolUtils {
             success = false;
         }
 
-        if (lambdaType.isVM()) {
-            try {
-                NetworkConfigurationUtils.removeTap(lambda.getConnection().tap);
-            } catch (InterruptedException e) {
-                Logger.log(Level.WARNING, Messages.ERROR_TAP_REMOVAL, e);
-            }
-        }
         return success;
     }
 
@@ -183,37 +145,8 @@ public class LambdaPoolUtils {
         }
     }
 
-    private static boolean shutdownFirecrackerLambda(Lambda lambda, String lambdaPath, LambdaType lambdaType) throws Throwable {
-        String lambdaMode = lambda.getExecutionMode().toString();
-        // Append lambda ID to command only if lambda was restored from snapshot (to terminate it properly).
-        String lambdaId = lambdaType == LambdaType.VM_FIRECRACKER_SNAPSHOT ? String.valueOf(lambda.getLambdaID()) : "";
-        Process p = new java.lang.ProcessBuilder("bash", "src/scripts/stop_firecracker.sh", lambdaPath, lambda.getLambdaName(), lambdaMode,
-                lambda.getConnection().ip, String.valueOf(lambda.getConnection().port), lambdaId).start();
-        p.waitFor();
-        if (p.exitValue() != 0) {
-            Logger.log(Level.WARNING, String.format("Lambda ID=%d failed to terminate successfully", lambda.getLambdaID()));
-            printStream(Level.WARNING, p.getErrorStream());
-            return false;
-        }
-        return true;
-    }
-
-    private static boolean shutdownContainerLambda(Lambda lambda, String lambdaPath) throws Throwable {
-        String lambdaMode = lambda.getExecutionMode().toString();
-        Process p = new java.lang.ProcessBuilder("bash", "src/scripts/stop_container.sh", lambdaPath, lambdaMode,
-                lambda.getConnection().ip, String.valueOf(lambda.getConnection().port), lambda.getLambdaName()).start();
-        p.waitFor();
-        if (p.exitValue() != 0) {
-            Logger.log(Level.WARNING, String.format("Lambda ID=%d failed to terminate successfully", lambda.getLambdaID()));
-            printStream(Level.WARNING, p.getErrorStream());
-            return false;
-        }
-        return true;
-    }
-
-    private static boolean shutdownNativeLambda(Lambda lambda, String lambdaPath) throws Throwable {
-        File f = new File(Environment.LAMBDA_LOGS + "/" + lambda.getLambdaName() + "/terminate.log");
-        Process p = new java.lang.ProcessBuilder("bash", "src/scripts/stop_graalos_native.sh", lambdaPath, String.valueOf(lambda.getConnection().port)).redirectOutput(f).redirectError(f).start();
+    private static boolean shutdownContainerLambda(Lambda lambda) throws Throwable {
+        Process p = new java.lang.ProcessBuilder("bash", "src/scripts/stop_container.sh", lambda.getLambdaName()).start();
         p.waitFor();
         if (p.exitValue() != 0) {
             Logger.log(Level.WARNING, String.format("Lambda ID=%d failed to terminate successfully", lambda.getLambdaID()));
@@ -236,15 +169,8 @@ public class LambdaPoolUtils {
 
         private LambdaReclaimingDaemon(LambdaManagerPool poolConfiguration, Map<String, ConcurrentLinkedQueue<Lambda>> lambdaPool) {
             this.maxLambdas = new HashMap<>();
-            this.maxLambdas.put(LambdaExecutionMode.HOTSPOT_W_AGENT.name(), poolConfiguration.getHotspotWithAgent());
-            this.maxLambdas.put(LambdaExecutionMode.HOTSPOT.name(), poolConfiguration.getHotspot());
-            this.maxLambdas.put(LambdaExecutionMode.HYDRA.name(), poolConfiguration.getHydra());
-            this.maxLambdas.put(LambdaExecutionMode.GRAALOS.name(), poolConfiguration.getHydra());
-            this.maxLambdas.put(LambdaExecutionMode.CUSTOM_JAVA.name(), poolConfiguration.getCustomJava());
-            this.maxLambdas.put(LambdaExecutionMode.CUSTOM_JAVASCRIPT.name(), poolConfiguration.getCustomJavaScript());
-            this.maxLambdas.put(LambdaExecutionMode.CUSTOM_PYTHON.name(), poolConfiguration.getCustomPython());
-            this.maxLambdas.put(LambdaExecutionMode.HYDRA_PGO.name(), poolConfiguration.getHydraPgo());
-            this.maxLambdas.put(LambdaExecutionMode.HYDRA_PGO_OPTIMIZED.name(), poolConfiguration.getHydraPgoOptimized());
+            this.maxLambdas.put(LambdaExecutionMode.MOSAIC.name(), poolConfiguration.getMosaic());
+            this.maxLambdas.put(LambdaExecutionMode.NATIVE.name(), poolConfiguration.getNative());
             this.lambdaPool = lambdaPool;
         }
 

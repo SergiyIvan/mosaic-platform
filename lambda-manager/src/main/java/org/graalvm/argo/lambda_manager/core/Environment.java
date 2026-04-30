@@ -1,19 +1,15 @@
 package org.graalvm.argo.lambda_manager.core;
 
 import java.nio.file.Paths;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Environment {
 
     private Environment() { }
 
-    private static long NEXT_ID = 0;
+    private static final AtomicInteger NEXT_ID = new AtomicInteger(0);
 
     private static volatile boolean shutdownHookActive = false;
-
-    public static final int RAND_STRING_LEN = 10;
-
-    // Tap name is limited to 15 characters. In our case tap names are created from prefix (4 chars) + random string (10 chars).
-    public static final String TAP_PREFIX = "lmt";
 
     // Project Directories.
     public static final String CODEBASE = "codebase";
@@ -27,31 +23,15 @@ public class Environment {
     public static final String ERROR = "error.log";
     public static final String MEMORY = "memory.log";
     public static final String MANAGER_LOG_FILENAME = Paths.get(MANAGER_LOGS, "lambda_manager.log").toString();
-    public static final String CREATE_TAPS_FILENAME = Paths.get(MANAGER_LOGS, "create_taps.log").toString();
-    public static final String REMOVE_TAPS_FILENAME = Paths.get(MANAGER_LOGS, "remove_taps.log").toString();
-    public static final String PREPARE_DEVMAPPER_BASE_FILENAME = Paths.get(MANAGER_LOGS, "prepare_devmapper_base.log").toString();
-    public static final String DELETE_DEVMAPPER_BASE_FILENAME = Paths.get(MANAGER_LOGS, "delete_devmapper_base.log").toString();
 
     public static final String MANAGER_METRICS_FILENAME = Paths.get(MANAGER_METRICS, "metrics.log").toString();
 
-    // Hydra runtime identifiers.
-    public static final String HYDRA_RUNTIME = "hydra";
-    public static final String KNATIVE_RUNTIME = "knative";
-    public static final String GRAALOS_RUNTIME = "graalos";
+    // Runtime identifiers.
+    public static final String NATIVE_RUNTIME = "native";
+    public static final String MOSAIC_RUNTIME = "mosaic";
 
-    // Cold start sliding window parameters.
-    /**
-     * Minimum number of cold starts within a period.
-     */
-    public static final int AOT_OPTIMIZATION_THRESHOLD = 3;
-
-    /**
-     * Period during which we count number of cold starts (in ms).
-     */
-    public static final int SLIDING_WINDOW_PERIOD = 480000;
-
-    public synchronized static long pid() {
-        return NEXT_ID++;
+    public static long pid() {
+        return NEXT_ID.incrementAndGet();
     }
 
     public static boolean notShutdownHookActive() {

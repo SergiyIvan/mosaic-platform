@@ -6,8 +6,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.graalvm.argo.lambda_manager.exceptions.argument_parser.ErrorDuringParsingJSONFile;
 import org.graalvm.argo.lambda_manager.exceptions.user.FunctionNotFound;
 import org.graalvm.argo.lambda_manager.metrics.MetricsProvider;
-import org.graalvm.argo.lambda_manager.optimizers.FunctionStatus;
-import org.graalvm.argo.lambda_manager.optimizers.LambdaExecutionMode;
 import org.graalvm.argo.lambda_manager.utils.JsonUtils;
 import org.graalvm.argo.lambda_manager.utils.Messages;
 import org.graalvm.argo.lambda_manager.utils.logger.Logger;
@@ -26,7 +24,7 @@ public class LambdaManager {
     /**
      * This set contains all the lambdas tracked by the lambda manager.
      */
-    public static final Set<Lambda> lambdas = Collections.newSetFromMap(new ConcurrentHashMap<Lambda, Boolean>());
+    public static final Set<Lambda> lambdas = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private static String formatRequestSpentTimeMessage(Lambda lambda, Function function, long spentTime, long infrTime) {
         String username = Configuration.coder.decodeUsername(function.getName());
@@ -36,7 +34,7 @@ public class LambdaManager {
 
     public static String processRequest(String username, String functionName, String arguments) {
         String response = null;
-        Function function = null;
+        Function function;
         Lambda lambda = null;
         long start = System.nanoTime();
 
@@ -73,17 +71,7 @@ public class LambdaManager {
 
                 response = Configuration.client.invokeFunction(lambda, function, arguments);
 
-                // TODO: Change message returned from GuestAPI, check for this new message. Remember to keep HTTP_TIMEOUT branch.
-                // This message should suggest that the Native Image runtime encountered unconfigured call.
-                if (response.equals(Messages.HTTP_TIMEOUT)) {
-                    if (function.canRebuild() && lambda.getExecutionMode() == LambdaExecutionMode.HYDRA) {
-                        // TODO: test fallback for Hydra once isolates do not terminate entire runtime
-                        function.setStatus(FunctionStatus.NOT_BUILT_NOT_CONFIGURED);
-                        targetMode = LambdaExecutionMode.HOTSPOT_W_AGENT;
-                        Logger.log(Level.INFO, "Decommissioning (failed requests) lambda " + lambda.getLambdaID());
-                        lambda.setDecommissioned(true);
-                    }
-                } else {
+                if (!response.equals(Messages.HTTP_TIMEOUT)) {
                     long requestTime = (System.nanoTime() - start) / 1000;
                     MetricsProvider.addRequest();
                     Logger.log(Level.FINE, formatRequestSpentTimeMessage(lambda, function, requestTime, infrTime));
@@ -98,7 +86,7 @@ public class LambdaManager {
                 }
                 response = Messages.INTERNAL_ERROR;
             } finally {
-                if (lambda != null && function != null) {
+                if (lambda != null) {
                     Configuration.scheduler.reschedule(lambda, function);
                 }
             }
@@ -110,15 +98,10 @@ public class LambdaManager {
 
     public static String uploadFunction(String username,
                                                 String functionName,
-                                                String functionLanguage,
-                                                String functionEntryPoint,
                                                 String functionMemory,
                                                 String functionRuntime,
                                                 String functionCode,
-                                                boolean functionIsolation,
-                                                boolean invocationCollocation,
-                                                String hydraSandbox,
-                                                String svmId) {
+                                                byte[] functionMetadata) {
         String responseString;
 
         if (!Configuration.isInitialized()) {
@@ -129,7 +112,7 @@ public class LambdaManager {
         String encodedFunctionName = Configuration.coder.encodeFunctionName(username, functionName);
         registrationInProgress.add(encodedFunctionName);
         try {
-            Function function = new Function(encodedFunctionName, functionLanguage, functionEntryPoint, functionMemory, functionRuntime, functionCode, functionIsolation, invocationCollocation, hydraSandbox, svmId);
+            Function function = new Function(encodedFunctionName, functionMemory, functionRuntime, functionCode, functionMetadata);
             Configuration.storage.register(encodedFunctionName, function, functionCode.getBytes());
             Logger.log(Level.INFO, String.format(Messages.SUCCESS_FUNCTION_UPLOAD, functionName));
             responseString = String.format(Messages.SUCCESS_FUNCTION_UPLOAD, functionName);
@@ -219,7 +202,7 @@ public class LambdaManager {
             // Registration might still be in progress, waiting.
             try {
                 Thread.sleep(100);
-            } catch (InterruptedException e) {}
+            } catch (InterruptedException ignored) {}
             if (!registrationInProgress.contains(encodedFunctionName)) {
                 // Registration finished or there was no registration request.
                 try {

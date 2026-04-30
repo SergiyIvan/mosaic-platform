@@ -46,7 +46,4 @@ public class Messages {
     public static final String ERROR_SERIALIZE_JSON = "Error during serialization of JSON object!";
     public static final String SUCCESS_SERIALIZE_JSON = "Serialized object is: %n%s";
 
-    // Metrics messages.
-    public static final String WARNING_SMALL_BUFFER = "There were %d offers after the buffer was filled. Consider increasing buffer's capacity.";
-
 }

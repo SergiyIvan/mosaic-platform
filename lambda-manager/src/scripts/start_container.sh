@@ -24,8 +24,8 @@ fi
 
 CONTAINER_SIZE_OPTIONS=
 
-# Only limit memory and CPU quota for OpenWhisk instances.
-if [[ $CONTAINER_IMAGE == openwhisk* ]]; then
+# Only limit memory and CPU quota for Mosaic and Native proxy instances.
+if [[ $CONTAINER_IMAGE == mosaic-proxy* || $CONTAINER_IMAGE == native-proxy* ]]; then
   LAMBDA_MEMORY=$4
   if [ -z "$LAMBDA_MEMORY" ]; then
     echo "Lambda memory is not present."
@@ -53,23 +53,17 @@ fi
 # To set up such tags as lambda_port, lambda_timestamp, and LD_LIBRARY_PATH.
 TAGS=( "${TAGS[@]/#/'-e '}" )
 
-# The default value for Hydra, Knative, and OpenWhisk.
+# The default value for our proxies.
 PROXY_PORT="8080"
 
 LAMBDA_HOME="$CODEBASE_HOME"/"$LAMBDA_NAME"
 mkdir "$LAMBDA_HOME" &> /dev/null
 
-if [[ "$LAMBDA_NAME" == *"AGENT"* ]]; then
-  mkdir "$LAMBDA_HOME"/config &> /dev/null
-  # TODO: copy config from the previous agent run and provide it to this agent.
-fi
-
 cd "$LAMBDA_HOME"
 
-docker run --privileged --rm --name="$LAMBDA_NAME" \
+docker run --rm --name="$LAMBDA_NAME" \
   ${TAGS[@]} \
   -p "$LAMBDA_PORT":"$PROXY_PORT" \
-  -v "$ARGO_HOME"/benchmarks/data/apps:/tmp/apps \
   $CONTAINER_SIZE_OPTIONS \
   "$CONTAINER_IMAGE" &
 

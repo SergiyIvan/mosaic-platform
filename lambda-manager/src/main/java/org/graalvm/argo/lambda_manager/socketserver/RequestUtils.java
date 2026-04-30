@@ -13,7 +13,7 @@ public class RequestUtils {
      * This pattern splits strings on spaces except if between quotes ('...');
      * Source: https://stackoverflow.com/a/7804472
      */
-    private static final String TOKEN_PATTERN = "([^']\\S*|'.+?')\\s*";
+    private static final String TOKEN_PATTERN = "([^']\\S*|'[\\s\\S]+?')\\s*";
     private static final String REQUEST_TYPE_UPLOAD = "upload";
     private static final String REQUEST_TYPE_INVOCATION = "invocation";
 
@@ -25,19 +25,13 @@ public class RequestUtils {
         if (REQUEST_TYPE_UPLOAD.equals(parameters.get("type"))) {
             String username = parameters.get("username");
             String functionName = parameters.get("function_name");
-            String functionLanguage = parameters.get("function_language");
-            String functionEntryPoint = parameters.get("function_entry_point");
             String functionMemory = parameters.get("function_memory");
             String functionRuntime = parameters.get("function_runtime");
-            String functionCode = parameters.get("payload");
-            boolean functionIsolation = Boolean.parseBoolean(parameters.get("function_isolation"));
-            boolean invocationCollocation = Boolean.parseBoolean(parameters.get("invocation_collocation"));
-            String hydraSandbox = parameters.get("hydra_sandbox");
-            String svmId = parameters.get("svm_id");
+            String functionCodeUrl = parameters.get("function_code_url");
+            byte[] functionMetadata = parameters.get("payload").getBytes();
 
-            result = LambdaManager.uploadFunction(username, functionName, functionLanguage, functionEntryPoint,
-                    functionMemory, functionRuntime, functionCode, Boolean.TRUE.equals(functionIsolation),
-                    Boolean.TRUE.equals(invocationCollocation), hydraSandbox, svmId);
+            result = LambdaManager.uploadFunction(username, functionName, functionMemory,
+                    functionRuntime, functionCodeUrl, functionMetadata);
         } else if (REQUEST_TYPE_INVOCATION.equals(parameters.get("type"))) {
             String username = parameters.get("username");
             String functionName = parameters.get("function_name");

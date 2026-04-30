@@ -3,13 +3,10 @@ micronaut:
     name: lambda-manager
   server:
     port: 30008
-    maxRequestSize: 100MB
-    max-request-size: 100MB
+    max-request-size: 1048576
     multipart:
-      max-file-size: 100MB
+      max-file-size: 1048576
       max-request-size: 100MB
-      maxFileSize: 100MB
-      maxRequestSize: 100MB
       enabled: true
     cors:
       enabled: true

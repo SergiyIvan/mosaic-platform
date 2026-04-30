@@ -39,7 +39,6 @@ public class NetworkUtils {
      * Checks if a particular port is open in a local or remote node.
      * @param node - ip or dns name.
      * @param port - port to probe.
-     * @param timeout - timeout in milliseconds.
      * @return True if the port is open. False otherwise.
      */
     private static boolean isPortOpen(String node, int port) {

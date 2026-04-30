@@ -17,8 +17,8 @@ public class SimpleFunctionStorage implements FunctionStorage {
     protected final ConcurrentHashMap<String, Function> functions = new ConcurrentHashMap<>();
 
     @Override
-    public Function register(String functionName, Function function, byte[] functionCode) throws Exception {
-        return functions.put(function.getName(), function);
+    public void register(String functionName, Function function, byte[] functionCode) throws Exception {
+        functions.put(function.getName(), function);
     }
 
     @Override

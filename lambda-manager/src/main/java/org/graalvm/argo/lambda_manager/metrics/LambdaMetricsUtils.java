@@ -4,53 +4,15 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 
 public class LambdaMetricsUtils {
 
     private static final double KB_IN_MB = 1024;
 
-    // Metrics collection for Firecracker VMs.
-    public static Map<String, Double> collectMemoryMetricsFirecracker() {
-        try {
-            InputStream stream = executeCommand("bash", "-c", "ps -C firecracker -o rss=,args=");
-            return readMemoryToMapFirecracker(stream);
-        } catch (Throwable thr) {
-            thr.printStackTrace();
-            return new HashMap<>();
-        }
-    }
-
     private static double kilobytesToMegabytes(double sizeKb) {
         return sizeKb / KB_IN_MB;
-    }
-
-    private static Map<String, Double> readMemoryToMapFirecracker(InputStream stream) {
-        Map<String, Double> rssRecords = new HashMap<>(128);
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                // The inner try/catch is needed to skip lambdas for which we cannot collect memory.
-                try {
-                    String rssString = line.substring(0, line.indexOf(' '));
-                    double rss = rssString.isEmpty() ? 0 : kilobytesToMegabytes(Double.parseDouble(rssString));
-                    // Each line has the the following format: "firecracker --socket /tmp/tapname.socket".
-                    // Here, we retrieve "tapname" as a unique identifier of a Firecracker VM.
-                    String lambdaId = line.substring(line.lastIndexOf("/tmp/") + 5, line.lastIndexOf('.'));
-                    rssRecords.put(lambdaId, rss);
-                } catch (Exception e) {
-                    // e.printStackTrace();
-                    // System.err.println(e.getMessage());
-                }
-            }
-        } catch (IOException ioe) {
-            ioe.printStackTrace();
-        }
-        return rssRecords;
     }
 
     private static InputStream executeCommand(String... command) throws InterruptedException, IOException {
@@ -112,32 +74,6 @@ public class LambdaMetricsUtils {
             thr.printStackTrace();
             return new double[]{0, 0};
         }
-    }
-
-    // Metrics collection for GraalOS (GraalHub) footprint.
-    public static List<Double> collectGraalOSFootprint() {
-        try (InputStream stream = executeCommand("bash", "-c", "top -bn 1 | grep \"GraalHub\"")) {
-            return readGraalHubFootprint(stream);
-        } catch (Throwable thr) {
-            thr.printStackTrace();
-            return Collections.emptyList();
-        }
-    }
-
-    private static List<Double> readGraalHubFootprint(InputStream stream) throws IOException {
-        List<Double> result = new LinkedList<>();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                // Line format:
-                // PID  USER  PR  NI  VIRT  RES  SHR  S  %CPU  %MEM  TIME+  COMMAND
-                if (line.contains("GraalHub")) {
-                    String[] tokens = line.trim().split("\\s+");
-                    result.add(kilobytesToMegabytes(Double.parseDouble(tokens[5])));
-                }
-            }
-        }
-        return result;
     }
 
     private static double[] readCpu(InputStream stream) throws IOException {

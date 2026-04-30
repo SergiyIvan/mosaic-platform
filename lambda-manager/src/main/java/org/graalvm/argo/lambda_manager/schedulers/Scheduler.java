@@ -2,7 +2,7 @@ package org.graalvm.argo.lambda_manager.schedulers;
 
 import org.graalvm.argo.lambda_manager.core.Function;
 import org.graalvm.argo.lambda_manager.core.Lambda;
-import org.graalvm.argo.lambda_manager.optimizers.LambdaExecutionMode;
+import org.graalvm.argo.lambda_manager.core.LambdaExecutionMode;
 
 /**
  * The scheduler decides where (in which Lambda) to execution a function invocation.

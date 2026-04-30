@@ -3,14 +3,11 @@ package org.graalvm.argo.lambda_manager.pool;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.graalvm.argo.lambda_manager.core.Configuration;
 import org.graalvm.argo.lambda_manager.core.Environment;
 import org.graalvm.argo.lambda_manager.core.Function;
 import org.graalvm.argo.lambda_manager.core.Lambda;
 import org.graalvm.argo.lambda_manager.core.LambdaType;
-import org.graalvm.argo.lambda_manager.optimizers.LambdaExecutionMode;
-import org.graalvm.argo.lambda_manager.processes.ProcessBuilder;
-import org.graalvm.argo.lambda_manager.processes.taps.RemoveTapsOutsidePool;
+import org.graalvm.argo.lambda_manager.core.LambdaExecutionMode;
 import org.graalvm.argo.lambda_manager.utils.LambdaConnection;
 import org.graalvm.argo.lambda_manager.pool.utils.LambdaPoolUtils;
 import org.graalvm.argo.lambda_manager.utils.NetworkConfigurationUtils;
@@ -28,25 +25,11 @@ public class ProactiveLambdaPool extends LambdaPool {
 
     @Override
     public void setUp() {
-        int lambdaPort = Configuration.argumentStorage.getLambdaPort();
-
         this.lambdaPool.putAll(Map.ofEntries(
-            Map.entry(LambdaExecutionMode.HOTSPOT_W_AGENT.name(), new ConcurrentLinkedQueue<>()),
-            Map.entry(LambdaExecutionMode.HOTSPOT.name(), new ConcurrentLinkedQueue<>()),
-            Map.entry(LambdaExecutionMode.HYDRA.name(), new ConcurrentLinkedQueue<>()),
-            Map.entry(LambdaExecutionMode.GRAALOS.name(), new ConcurrentLinkedQueue<>()),
-            Map.entry(LambdaExecutionMode.CUSTOM_JAVA.name(), new ConcurrentLinkedQueue<>()),
-            Map.entry(LambdaExecutionMode.CUSTOM_JAVASCRIPT.name(), new ConcurrentLinkedQueue<>()),
-            Map.entry(LambdaExecutionMode.CUSTOM_PYTHON.name(), new ConcurrentLinkedQueue<>()),
-            Map.entry(LambdaExecutionMode.HYDRA_PGO.name(), new ConcurrentLinkedQueue<>()),
-            Map.entry(LambdaExecutionMode.HYDRA_PGO_OPTIMIZED.name(), new ConcurrentLinkedQueue<>())));
+            Map.entry(LambdaExecutionMode.MOSAIC.name(), new ConcurrentLinkedQueue<>()),
+            Map.entry(LambdaExecutionMode.NATIVE.name(), new ConcurrentLinkedQueue<>())));
 
-        if (lambdaType.isVM()) {
-            String gatewayWithMask = Configuration.argumentStorage.getGatewayWithMask();
-            NetworkConfigurationUtils.prepareVmConnectionPool(connectionPool, maxLambdas, gatewayWithMask, lambdaPort);
-        } else {
-            NetworkConfigurationUtils.prepareContainerConnectionPool(connectionPool, maxLambdas);
-        }
+        NetworkConfigurationUtils.prepareContainerConnectionPool(connectionPool, maxLambdas);
 
         LambdaPoolUtils.prepareLambdaPool(lambdaPool, poolConfiguration);
         LambdaPoolUtils.startLambdaReclaimingDaemon(lambdaPool, poolConfiguration);
@@ -78,20 +61,13 @@ public class ProactiveLambdaPool extends LambdaPool {
     }
 
     @Override
-    public void tearDown() throws InterruptedException {
+    public void tearDown() {
         // Shutdown lambdas inside pool and starting lambdas.
         lambdaPool.values().forEach(LambdaPoolUtils::shutdownLambdas);
 
         // Close any lasting connection.
         for (LambdaConnection connection : connectionPool) {
             connection.client.close();
-        }
-
-        // Delete os-level network interfaces.
-        if (lambdaType.isVM()) {
-            ProcessBuilder removeTapsOutsidePoolWorker = new RemoveTapsOutsidePool(null).build();
-            removeTapsOutsidePoolWorker.start();
-            removeTapsOutsidePoolWorker.join();
         }
 
         // Clearing the connection pool.

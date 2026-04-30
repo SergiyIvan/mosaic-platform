@@ -1,23 +1,16 @@
 package org.graalvm.argo.lambda_manager.core;
 
-import com.github.maltalex.ineter.range.IPv4Subnet;
 import io.reactivex.exceptions.UndeliverableException;
 import io.reactivex.plugins.RxJavaPlugins;
 import org.graalvm.argo.lambda_manager.client.DefaultLambdaManagerClient;
 import org.graalvm.argo.lambda_manager.encoders.DefaultCoder;
 import org.graalvm.argo.lambda_manager.function_storage.LocalFunctionStorage;
-import org.graalvm.argo.lambda_manager.function_storage.SimpleFunctionStorage;
 import org.graalvm.argo.lambda_manager.metrics.MetricsScraper;
 import org.graalvm.argo.lambda_manager.pool.LambdaPool;
 import org.graalvm.argo.lambda_manager.pool.ProactiveLambdaPool;
 import org.graalvm.argo.lambda_manager.pool.ReactiveLambdaPool;
-import org.graalvm.argo.lambda_manager.processes.ProcessBuilder;
-import org.graalvm.argo.lambda_manager.processes.devmapper.PrepareDevmapperBase;
 import org.graalvm.argo.lambda_manager.processes.lambda.factory.AbstractLambdaFactory;
 import org.graalvm.argo.lambda_manager.processes.lambda.factory.ContainerLambdaFactory;
-import org.graalvm.argo.lambda_manager.processes.lambda.factory.FirecrackerLambdaFactory;
-import org.graalvm.argo.lambda_manager.processes.lambda.factory.FirecrackerSnapshotLambdaFactory;
-import org.graalvm.argo.lambda_manager.processes.lambda.factory.NativeLambdaFactory;
 import org.graalvm.argo.lambda_manager.schedulers.RoundedRobinScheduler;
 import org.graalvm.argo.lambda_manager.utils.Messages;
 import org.graalvm.argo.lambda_manager.utils.logger.ElapseTimer;
@@ -56,16 +49,11 @@ public class ArgumentStorage {
     private LambdaPool lambdaPool;
 
     // TODO - add comments to the rest of these fields.
-    private String gateway;
-    private String gatewayWithMask;
-    private String mask;
     private int timeout;
     private int healthCheck;
     private int lambdaPort;
     private int maxMemory;
     private int cpuQuota;
-    private boolean isLambdaConsoleActive; // TODO - do we ever disable this?
-    private boolean isOptimizationPipelineEnabled;
 
     private int firstLambdaPort;
     private int faultTolerance;
@@ -89,9 +77,6 @@ public class ArgumentStorage {
     private ArgumentStorage() { }
 
     private void initClassFields(LambdaManagerConfiguration lambdaManagerConfiguration, VariablesConfiguration variablesConfiguration) {
-        this.gateway = lambdaManagerConfiguration.getGateway().split("/")[0];
-        this.gatewayWithMask = lambdaManagerConfiguration.getGateway();
-        this.mask = IPv4Subnet.of(lambdaManagerConfiguration.getGateway()).getNetworkMask().toString();
         this.lambdaType = LambdaType.fromString(lambdaManagerConfiguration.getLambdaType());
         this.maxMemory = lambdaManagerConfiguration.getMaxMemory();
         this.cpuQuota = ((maxMemory * 1000 / 1024) / 2) * 100; // MiB to MB; divide by two due to ratio; multiply by 100 to get cgroups quota.
@@ -99,8 +84,6 @@ public class ArgumentStorage {
         this.healthCheck = lambdaManagerConfiguration.getHealthCheck();
         this.lambdaPort = lambdaManagerConfiguration.getLambdaPort();
         initLambdaFactory(this.lambdaType);
-        this.isLambdaConsoleActive = lambdaManagerConfiguration.isLambdaConsole();
-        this.isOptimizationPipelineEnabled = lambdaManagerConfiguration.isOptimizationPipeline();
 
         // Global variables coming from a separate JSON file.
         this.firstLambdaPort = variablesConfiguration.getFirstLambdaPort();
@@ -114,18 +97,9 @@ public class ArgumentStorage {
 
     private void initLambdaFactory(LambdaType lambdaType) {
         switch (lambdaType) {
-            case VM_FIRECRACKER:
-                this.lambdaFactory = new FirecrackerLambdaFactory();
-                break;
-            case VM_FIRECRACKER_SNAPSHOT:
-                this.lambdaFactory = new FirecrackerSnapshotLambdaFactory();
-                break;
             case CONTAINER:
             case CONTAINER_DEBUG:
                 this.lambdaFactory = new ContainerLambdaFactory();
-                break;
-            case GRAALOS_NATIVE:
-                this.lambdaFactory = new NativeLambdaFactory();
                 break;
             default:
                 throw new IllegalStateException("Could not instantiate lambda factory due to unknown lambda type: " + lambdaType);
@@ -194,10 +168,7 @@ public class ArgumentStorage {
         initMetricsScraper();
 
         LambdaManagerPool poolConfiguration = lambdaManagerConfiguration.getLambdaPool();
-        boolean hasLambdaPoolConfig = poolConfiguration.getCustomJava() != 0 || poolConfiguration.getCustomJavaScript() != 0
-                || poolConfiguration.getCustomPython() != 0 || poolConfiguration.getGraalOS() != 0 || poolConfiguration.getHydra() != 0
-                || poolConfiguration.getHydraPgo() != 0 || poolConfiguration.getHydraPgoOptimized() != 0
-                || poolConfiguration.getHotspot() != 0 || poolConfiguration.getHotspotWithAgent() != 0;
+        boolean hasLambdaPoolConfig = poolConfiguration.getMosaic() != 0 || poolConfiguration.getNative() != 0;
 
         Configuration.initFields(
             new RoundedRobinScheduler(),
@@ -206,17 +177,12 @@ public class ArgumentStorage {
             new DefaultLambdaManagerClient(),
             this);
 
-        if (lambdaType == LambdaType.VM_FIRECRACKER || lambdaType == LambdaType.VM_FIRECRACKER_SNAPSHOT) {
-            prepareDevmapper();
-        }
-
         ElapseTimer.init(); // Start internal timer.
 
         // Initialize the lambda pool and start the reclaiming task.
         if (hasLambdaPoolConfig) {
             this.lambdaPool = new ProactiveLambdaPool(lambdaType, lambdaManagerConfiguration.getMaxTaps(), poolConfiguration);
         } else {
-            // For OpenWhisk and Knative only.
             this.lambdaPool = new ReactiveLambdaPool(lambdaType, lambdaManagerConfiguration.getMaxTaps());
         }
         this.lambdaPool.setUp();
@@ -255,34 +221,12 @@ public class ArgumentStorage {
         });
     }
 
-    private void prepareDevmapper() {
-        try {
-            ProcessBuilder prepareDevmapperBase = new PrepareDevmapperBase().build();
-            prepareDevmapperBase.start();
-            prepareDevmapperBase.join();
-        } catch (InterruptedException e) {
-            throw new IllegalStateException("Could not prepare devmapper base: " + e);
-        }
-    }
-
     public static void initializeLambdaManager(LambdaManagerConfiguration lambdaManagerConfiguration, VariablesConfiguration variablesConfiguration) {
         new ArgumentStorage().doInitialize(lambdaManagerConfiguration, variablesConfiguration);
     }
 
-    public String getGateway() {
-        return gateway;
-    }
-
-    public String getGatewayWithMask() {
-        return gatewayWithMask;
-    }
-
     public LambdaPool getLambdaPool() {
         return lambdaPool;
-    }
-
-    public String getMask() {
-        return mask;
     }
 
     public int getTimeout() {
@@ -309,24 +253,12 @@ public class ArgumentStorage {
         return lambdaType;
     }
 
-    public boolean isSnapshotEnabled() {
-        return lambdaType == LambdaType.VM_FIRECRACKER_SNAPSHOT;
-    }
-
     public boolean isDebugMode() {
         return lambdaType == LambdaType.CONTAINER_DEBUG;
     }
 
     public AbstractLambdaFactory getLambdaFactory() {
         return lambdaFactory;
-    }
-
-    public boolean isLambdaConsoleActive() {
-        return isLambdaConsoleActive;
-    }
-
-    public boolean isOptimizationPipelineEnabled() {
-        return isOptimizationPipelineEnabled;
     }
 
     public void tearDownMetricsScraper() {

@@ -1,11 +1,9 @@
 package org.graalvm.argo.lambda_manager.pool;
 
 import org.graalvm.argo.lambda_manager.core.*;
-import org.graalvm.argo.lambda_manager.optimizers.LambdaExecutionMode;
+import org.graalvm.argo.lambda_manager.core.LambdaExecutionMode;
 import org.graalvm.argo.lambda_manager.pool.utils.LambdaPoolUtils;
-import org.graalvm.argo.lambda_manager.processes.ProcessBuilder;
 import org.graalvm.argo.lambda_manager.processes.lambda.DefaultLambdaShutdownHandler;
-import org.graalvm.argo.lambda_manager.processes.taps.RemoveTapsOutsidePool;
 import org.graalvm.argo.lambda_manager.utils.LambdaConnection;
 import org.graalvm.argo.lambda_manager.utils.NetworkConfigurationUtils;
 
@@ -41,13 +39,7 @@ public class ReactiveLambdaPool extends LambdaPool {
 
     @Override
     public void setUp() {
-        if (lambdaType.isVM()) {
-            int lambdaPort = Configuration.argumentStorage.getLambdaPort();
-            String gatewayWithMask = Configuration.argumentStorage.getGatewayWithMask();
-            NetworkConfigurationUtils.prepareVmConnectionPool(connectionPool, maxLambdas, gatewayWithMask, lambdaPort);
-        } else {
-            NetworkConfigurationUtils.prepareContainerConnectionPool(connectionPool, maxLambdas);
-        }
+        NetworkConfigurationUtils.prepareContainerConnectionPool(connectionPool, maxLambdas);
     }
 
     @Override
@@ -63,20 +55,13 @@ public class ReactiveLambdaPool extends LambdaPool {
     }
 
     @Override
-    public void tearDown() throws InterruptedException {
+    public void tearDown() {
         // Shutdown lambdas inside pool and starting lambdas.
         lambdaPool.values().forEach(LambdaPoolUtils::shutdownLambdas);
 
         // Close any lasting connection.
         for (LambdaConnection connection : connectionPool) {
             connection.client.close();
-        }
-
-        // Delete os-level network interfaces.
-        if (lambdaType.isVM()) {
-            ProcessBuilder removeTapsOutsidePoolWorker = new RemoveTapsOutsidePool(null).build();
-            removeTapsOutsidePoolWorker.start();
-            removeTapsOutsidePoolWorker.join();
         }
 
         // Clearing the connection pool.

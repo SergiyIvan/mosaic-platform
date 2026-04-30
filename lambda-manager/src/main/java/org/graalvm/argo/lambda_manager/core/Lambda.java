@@ -1,10 +1,7 @@
 package org.graalvm.argo.lambda_manager.core;
 
-import org.graalvm.argo.lambda_manager.optimizers.FunctionStatus;
-import org.graalvm.argo.lambda_manager.optimizers.LambdaExecutionMode;
 import org.graalvm.argo.lambda_manager.utils.LambdaConnection;
 
-import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -48,9 +45,9 @@ public class Lambda {
         this.terminationLock = new AtomicBoolean(false);
     }
 
-	public long setLambdaID(long lid) {
-		return this.lid = lid;
-	}
+	public void setLambdaID(long lid) {
+        this.lid = lid;
+    }
 
 	public long getLambdaID() {
 		return this.lid;
@@ -65,10 +62,6 @@ public class Lambda {
 
 	public void resetClosedRequestCount() {
 		closedRequestCount = 0;
-	}
-
-	public int getClosedRequestCount() {
-		return closedRequestCount;
 	}
 
 	public int getOpenRequestCount() {
@@ -114,26 +107,15 @@ public class Lambda {
         this.registeredFunctions.putIfAbsent(function.getName(), function);
     }
 
-    // TODO: check for all places (including this method) where we should add new modes
-    // to configure "collocatability" and other things.
     public boolean canRegisterInLambda(Function function) {
         if (username == null) {
             return true;
         }
-        if (executionMode == LambdaExecutionMode.HYDRA) {
-            if (function.isFunctionIsolated()) {
-                return (registeredFunctions.contains(function)) && username.equals(Configuration.coder.decodeUsername(function.getName()));
-            } else {
-                // In Hydra, functions can be collocated only if they come from the same user. Debug mode allows collocating all functions from all users.
-                return Configuration.argumentStorage.isDebugMode() || username.equals(Configuration.coder.decodeUsername(function.getName()));
-            }
-        } else {
-            return (registeredFunctions.contains(function)) && username.equals(Configuration.coder.decodeUsername(function.getName()));
-        }
+        return (registeredFunctions.contains(function)) && username.equals(Configuration.coder.decodeUsername(function.getName()));
     }
 
     public boolean tryRegisterInLambda(Function function) {
-        boolean lambdaAvailable = tryBookLambda(function);
+        boolean lambdaAvailable = tryBookLambda();
         if (lambdaAvailable) {
             // We need the synchronized block to avoid double-registration in collocatable lambdas.
             // The race condition happens because we first test if we can register, and then set registered.
@@ -181,21 +163,6 @@ public class Lambda {
         return requiresFunctionUpload.remove(function);
     }
 
-    /** This method is only called after a lambda with Agent terminates. */
-    public void updateFunctionStatus() {
-        // Iterator is used to efficiently obtain the only element of the set.
-        Iterator<Function> iterator = registeredFunctions.values().iterator();
-        if (!iterator.hasNext()) {
-            throw new IllegalStateException(String.format("HotSpot with Agent lambda %d does not have any functions registered.", lid));
-        }
-        Function function = iterator.next();
-        if (iterator.hasNext()) {
-            throw new IllegalStateException(String.format("HotSpot with Agent lambda %d has more than one functions registered.", lid));
-        }
-        function.setLastAgentPID(lid);
-        function.setStatus(FunctionStatus.NOT_BUILT_CONFIGURED);
-    }
-
     /**
      * Check whether this lambda has not been used.
      */
@@ -204,9 +171,8 @@ public class Lambda {
     }
 
     // Booking a lambda primarily matters for non-collocatable modes.
-    public boolean tryBookLambda(Function function) {
-        // Increment the open request count (replaces incOpenRequests).
-        return function.canCollocateInvocation() ? openRequestCount.incrementAndGet() > 0 : openRequestCount.compareAndSet(0, 1);
+    public boolean tryBookLambda() {
+        return openRequestCount.compareAndSet(0, 1);
     }
 
     public boolean tryAcquireTerminationLock() {

@@ -21,7 +21,7 @@ public class LambdaManagerController {
                                          @Nullable @QueryValue("count") String warmupCount) {
         // Note: by default, warmupCount is null. Only used for demos using the web interface.
         if (warmupCount != null) {
-            for (int i = 0; i < Integer.valueOf(warmupCount); i++) {
+            for (int i = 0; i < Integer.parseInt(warmupCount); i++) {
                 LambdaManager.processRequest(username, functionName, arguments);
             }
         }
@@ -41,18 +41,12 @@ public class LambdaManagerController {
     @Post(value = "/upload_function", consumes = MediaType.TEXT_PLAIN)
     public String uploadFunction(@QueryValue("username") String username,
                                          @QueryValue("function_name") String functionName,
-                                         @QueryValue("function_language") String functionLanguage,
-                                         @QueryValue("function_entry_point") String functionEntryPoint,
                                          @QueryValue("function_memory") String functionMemory,
+                                         @QueryValue("function_code_url") String functionCodeUrl,
                                          @Nullable @QueryValue("function_runtime") String functionRuntime,
-                                         @Nullable @QueryValue("function_isolation") Boolean functionIsolation,
-                                         @Nullable @QueryValue("invocation_collocation") Boolean invocationCollocation,
-                                         @Nullable @QueryValue("hydra_sandbox") String hydraSandbox,
-                                         @Nullable @QueryValue("svm_id") String svmId,
-                                         @Body String functionCode) {
-        return LambdaManager.uploadFunction(username, functionName, functionLanguage, functionEntryPoint,
-                functionMemory, functionRuntime, functionCode, Boolean.TRUE.equals(functionIsolation),
-                Boolean.TRUE.equals(invocationCollocation), hydraSandbox, svmId);
+                                         @Nullable @Body byte[] functionMetadata) {
+        return LambdaManager.uploadFunction(username, functionName, functionMemory,
+                functionRuntime, functionCodeUrl, functionMetadata);
     }
 
     @Post("/remove_function")
