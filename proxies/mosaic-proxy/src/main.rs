@@ -16,7 +16,7 @@ type TrampolineDispatch = unsafe extern "C" fn(
 
 struct ProxyState {
     engine: Engine,
-    loaded_lib: Option<Arc<Library>>,
+    loaded_libs: Vec<Arc<Library>>,
     wasm_module: Option<Module>,
     linker: Option<Linker<ProxyModuleState>>,
 }
@@ -29,9 +29,14 @@ struct HostFuncDef {
 }
 
 #[derive(Deserialize)]
+struct TrampolineDef {
+    url: String,
+    functions: Vec<HostFuncDef>,
+}
+
+#[derive(Deserialize)]
 struct InitParams {
     wasm_url: String,
-    trampoline_url: String,
 }
 
 #[derive(Serialize)]
@@ -56,84 +61,97 @@ fn parse_valtype(t: &str) -> ValType {
     }
 }
 
+
 async fn init_handler(
     State(state): State<Arc<Mutex<ProxyState>>>,
     Query(params): Query<InitParams>,
-    Json(host_funcs): Json<Vec<HostFuncDef>>,
+    Json(trampolines): Json<Vec<TrampolineDef>>,
 ) -> Json<GenericResponse> {
     let mut state_lock = state.lock().unwrap();
 
-    if state_lock.loaded_lib.is_some() {
-        return Json(GenericResponse { status: "error".into(), message: "A function is already registered in this proxy instance.".into() });
+    if !state_lock.loaded_libs.is_empty() {
+        return Json(GenericResponse { status: "error".into(), message: "Functions are already registered in this proxy instance.".into() });
     }
 
-    // Download & load trampoline (.so).
-    let tramp_path = "/tmp/trampoline.so";
-    let tramp_bytes = reqwest::blocking::get(&params.trampoline_url).unwrap().bytes().unwrap();
-    File::create(tramp_path).unwrap().write_all(&tramp_bytes).unwrap();
-
     // Download & init Wasm guest.
-    let wasm_bytes = reqwest::blocking::get(&params.wasm_url).unwrap().bytes().unwrap();
-    let module = Module::new(&state_lock.engine, &wasm_bytes).unwrap();
-
-    // Loading lib and extracting address of the trampoline function.
-    let lib = unsafe { Arc::new(Library::new(tramp_path).unwrap()) };
-    let dispatch_ptr: usize = unsafe {
-        let sym: Symbol<TrampolineDispatch> = lib.get(b"trampoline_dispatch").unwrap();
-        *sym as *const () as usize
+    let wasm_bytes = match reqwest::blocking::get(&params.wasm_url) {
+        Ok(res) => res.bytes().unwrap(),
+        Err(_) => return Json(GenericResponse { status: "error".into(), message: "Failed to download Wasm module.".into() }),
     };
+    let module = Module::new(&state_lock.engine, &wasm_bytes).unwrap();
 
     // Build dynamic Linker.
     let mut linker: Linker<ProxyModuleState> = Linker::new(&state_lock.engine);
     preview1::add_to_linker_sync(&mut linker, |state| &mut state.wasi).unwrap();
 
-    for func_def in host_funcs {
-        let params: Vec<ValType> = func_def.param_types.iter().map(|t| parse_valtype(t)).collect();
-        let results = vec![ValType::I32]; // Assuming standard i32 return.
+    let mut loaded_libs = Vec::new();
 
-        let func_type = FuncType::new(&state_lock.engine, params, results);
+    for (idx, tramp_def) in trampolines.into_iter().enumerate() {
+        // Assign unique temp file for each library.
+        let tramp_path = format!("/tmp/trampoline_{}.so", idx);
 
-        let func_name_cloned = func_def.name.clone();
+        let tramp_bytes = match reqwest::blocking::get(&tramp_def.url) {
+            Ok(res) => res.bytes().unwrap(),
+            Err(_) => return Json(GenericResponse { status: "error".into(), message: format!("Failed to download trampoline at {}.", tramp_def.url) }),
+        };
 
-        linker.func_new(&func_def.module, &func_def.name, func_type,
-            move |mut caller, args: &[Val], rets: &mut [Val]| -> anyhow::Result<()> {
+        File::create(&tramp_path).unwrap().write_all(&tramp_bytes).unwrap();
 
-                // Extract Wasm memory.
-                let mem = caller.get_export("memory").unwrap().into_memory().unwrap();
-                let mem_base = mem.data_mut(&mut caller).as_mut_ptr();
-                let mem_len = mem.data(&caller).len();
+        // Load lib and extract address of the trampoline function.
+        let lib = unsafe { Arc::new(Library::new(&tramp_path).unwrap()) };
+        let dispatch_ptr: usize = unsafe {
+            let sym: Symbol<TrampolineDispatch> = lib.get(b"trampoline_dispatch").unwrap();
+            *sym as *const () as usize
+        };
 
-                // Flatten Wasm args to standard u64 array for C-ABI.
-                let flat_args: Vec<u64> = args.iter().map(|v| match v {
-                    Val::I32(i) => *i as u64, Val::I64(i) => *i as u64, _ => 0,
-                }).collect();
+        for func_def in tramp_def.functions {
+            let params: Vec<ValType> = func_def.param_types.iter().map(|t| parse_valtype(t)).collect();
+            let results = vec![ValType::I32]; // Assuming standard i32 return.
 
-                let mut ret_val: u64 = 0;
+            let func_type = FuncType::new(&state_lock.engine, params, results);
+            let func_name_cloned = func_def.name.clone();
 
-                // Calling into trampoline function.
-                unsafe {
-                    let dispatch_fn: TrampolineDispatch = std::mem::transmute(dispatch_ptr);
+            linker.func_new(&func_def.module, &func_def.name, func_type,
+                move |mut caller, args: &[Val], rets: &mut [Val]| -> anyhow::Result<()> {
 
-                    let success = dispatch_fn(
-                        func_name_cloned.as_ptr(), func_name_cloned.len(),
-                        mem_base, mem_len,
-                        flat_args.as_ptr(), flat_args.len(),
-                        &mut ret_val
-                    );
+                    let mem = caller.get_export("memory").unwrap().into_memory().unwrap();
+                    let mem_base = mem.data_mut(&mut caller).as_mut_ptr();
+                    let mem_len = mem.data(&caller).len();
 
-                    rets[0] = Val::I32(if success { ret_val as i32 } else { 0 });
+                    let flat_args: Vec<u64> = args.iter().map(|v| match v {
+                        Val::I32(i) => *i as u64, Val::I64(i) => *i as u64, _ => 0,
+                    }).collect();
+
+                    let mut ret_val: u64 = 0;
+
+                    // Call into the SPECIFIC trampoline for this function.
+                    unsafe {
+                        let dispatch_fn: TrampolineDispatch = std::mem::transmute(dispatch_ptr);
+
+                        let success = dispatch_fn(
+                            func_name_cloned.as_ptr(), func_name_cloned.len(),
+                            mem_base, mem_len,
+                            flat_args.as_ptr(), flat_args.len(),
+                            &mut ret_val
+                        );
+
+                        rets[0] = Val::I32(if success { ret_val as i32 } else { 0 });
+                    }
+                    Ok(())
                 }
-                Ok(())
-            }
-        ).unwrap();
+            ).unwrap();
+        }
+
+        loaded_libs.push(lib);
     }
 
-    state_lock.loaded_lib = Some(lib);
+    state_lock.loaded_libs = loaded_libs;
     state_lock.wasm_module = Some(module);
     state_lock.linker = Some(linker);
 
-    Json(GenericResponse { status: "success".into(), message: "Function registered and loaded successfully.".into() })
+    Json(GenericResponse { status: "success".into(), message: "Functions registered and loaded successfully.".into() })
 }
+
 
 async fn run_handler(
     State(state): State<Arc<Mutex<ProxyState>>>,
@@ -194,13 +212,14 @@ async fn run_handler(
     Json(GenericResponse { status: "success".into(), message: result_str.to_string() })
 }
 
+
 #[tokio::main]
 async fn main() {
     let engine = Engine::default();
 
     let state = Arc::new(Mutex::new(ProxyState {
         engine,
-        loaded_lib: None,
+        loaded_libs: Vec::new(),
         wasm_module: None,
         linker: None,
     }));
