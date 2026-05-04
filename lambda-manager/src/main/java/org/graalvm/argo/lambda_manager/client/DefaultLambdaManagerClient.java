@@ -27,7 +27,7 @@ public class DefaultLambdaManagerClient implements LambdaManagerClient {
             sendRequest("/ping", payload, lambda, 1);
 
             if (lambda.getExecutionMode().isMosaic()) {
-                path = String.format("/init?url=%s", function.getFunctionCode());
+                path = String.format("/init?wasm_url=%s", function.getFunctionCode());
                 payload = function.getFunctionMetadata();
             } else if (lambda.getExecutionMode().isNative()) {
                 path = String.format("/init?url=%s", function.getFunctionCode());

@@ -1,9 +1,8 @@
 #!/bin/bash
 
-if [[ -z "${ARGO_HOME}" ]]; then
-    echo "ARGO_HOME is not defined. Exiting..."
-    exit 1
-fi
+function DIR {
+    echo "$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+}
 
 # Load benchmarks configs.
 source "$(dirname "${BASH_SOURCE[0]}")/benchmarks.sh"
@@ -16,120 +15,42 @@ NC='\033[0m' # No Color
 LAMBDA_MANAGER_HOST=localhost
 LAMBDA_MANAGER_PORT=30008
 LAMBDA_MANAGER_SOCKET_PORT=30009
-LAMBDA_MANAGER_HOME=$ARGO_HOME/lambda-manager
+LAMBDA_MANAGER_HOME="$(DIR)/.."
 
 USER=user
 
 
 function register {
     bench=$1
-    mode=${bench:0:2}
-    register_func="register_$mode"
-
-    # Invoke mode-specific function.
-    "$register_func" "$bench"
-}
-
-function register_hy {
-    bench=$1
 
     if [ -z "$FUNCTION_MEMORY" ]; then
         FUNCTION_MEMORY=512
     fi
-    if [ -z "$FUNCTION_ISOLATION" ]; then
-        FUNCTION_ISOLATION=false
-    fi
-    if [ -z "$INVOCATION_COLLOCATION" ]; then
-        INVOCATION_COLLOCATION=true
-    fi
 
-    lang=
-    if [[ $bench == "hy_jv"* ]]; then
-        lang=java
-    elif [[ $bench == "hy_py"* ]]; then
-        lang=python
-    elif [[ $bench == "hy_js"* ]]; then
-        lang=javascript
+    runtime=
+    if [[ $bench == "na_"* ]]; then
+        runtime="native"
+    elif [[ $bench == "mo_"* ]]; then
+        runtime="mosaic"
     else
-        echo "Cannot determine language of the benchmark: $bench"
-    fi
-
-    runtime=hydra
-
-    entrypoint=${BENCHMARK_ENTRYPOINTS["$bench"]}
-    code=${BENCHMARK_CODE["$bench"]}
-    sandbox=${BENCHMARK_SANDBOXES["$bench"]}
-    svm_id=${BENCHMARK_SVMIDS["$bench"]}
-
-    hy_parameters="hydra_sandbox=$sandbox"
-    if [ -n "$svm_id" ]; then
-        hy_parameters="$hy_parameters&svm_id=$svm_id"
-    fi
-
-    curl -s -X POST $LAMBDA_MANAGER_HOST:$LAMBDA_MANAGER_PORT/upload_function?username=$USER\&function_name=$bench\&function_language=$lang\&function_entry_point=$entrypoint\&function_memory=$FUNCTION_MEMORY\&function_runtime=$runtime\&function_isolation=$FUNCTION_ISOLATION\&invocation_collocation=$INVOCATION_COLLOCATION\&$hy_parameters -H 'Content-Type: text/plain' --data $code
-}
-
-function register_ow {
-    bench=$1
-
-    if [ -z "$FUNCTION_MEMORY" ]; then
-        FUNCTION_MEMORY=512
-    fi
-    FUNCTION_ISOLATION=true
-    INVOCATION_COLLOCATION=false
-
-    runtime=openwhisk
-    lang=
-    if [[ $bench == *"_jv_"* ]]; then
-        lang=java
-    elif [[ $bench == *"_js_"* ]]; then
-        lang=javascript
-    elif [[ $bench == *"_py_"* ]]; then
-        lang=python
-    else
-        echo "Unknown benchmark language: $bench"
+        echo -e "${RED}Cannot determine runtime of the benchmark: $bench${NC}"
         exit 1
     fi
 
-    entrypoint=${BENCHMARK_ENTRYPOINTS["$bench"]}
-    code=${BENCHMARK_CODE["$bench"]}
+    code_url=${BENCHMARK_CODE["$bench"]}
+    metadata=${BENCHMARK_METADATA["$bench"]}
 
-    curl -s -X POST $LAMBDA_MANAGER_HOST:$LAMBDA_MANAGER_PORT/upload_function?username=$USER\&function_name=$bench\&function_language=$lang\&function_entry_point=$entrypoint\&function_memory=$FUNCTION_MEMORY\&function_runtime=$runtime\&function_isolation=$FUNCTION_ISOLATION\&invocation_collocation=$INVOCATION_COLLOCATION -H 'Content-Type: text/plain' --data $code
-}
-
-function register_kn {
-    bench=$1
-
-    if [ -z "$FUNCTION_MEMORY" ]; then
-        FUNCTION_MEMORY=512
-    fi
-    FUNCTION_ISOLATION=true
-    INVOCATION_COLLOCATION=true
-
-    runtime=knative
-    lang=
-    if [[ $bench == *"_jv_"* ]]; then
-        lang=java
-    elif [[ $bench == *"_js_"* ]]; then
-        lang=javascript
-    elif [[ $bench == *"_py_"* ]]; then
-        lang=python
-    else
-        echo "Unknown benchmark language: $bench"
-        exit 1
-    fi
-
-    entrypoint=${BENCHMARK_ENTRYPOINTS["$bench"]}
-    code=${BENCHMARK_CODE["$bench"]}
-
-    curl -s -X POST $LAMBDA_MANAGER_HOST:$LAMBDA_MANAGER_PORT/upload_function?username=$USER\&function_name=$bench\&function_language=$lang\&function_entry_point=$entrypoint\&function_memory=$FUNCTION_MEMORY\&function_runtime=$runtime\&function_isolation=$FUNCTION_ISOLATION\&invocation_collocation=$INVOCATION_COLLOCATION -H 'Content-Type: text/plain' --data $code
+    echo "Registering $bench ($runtime)..."
+    curl -s -X POST "$LAMBDA_MANAGER_HOST:$LAMBDA_MANAGER_PORT/upload_function?username=$USER&function_name=$bench&function_memory=$FUNCTION_MEMORY&function_code_url=$code_url&function_runtime=$runtime" \
+         -H 'Content-Type: text/plain' \
+         --data "$metadata"
 }
 
 function request {
     bench=$1
 
     echo -e "${GREEN}Invoking $bench...${NC}"
-    curl -s -X POST $LAMBDA_MANAGER_HOST:$LAMBDA_MANAGER_PORT/$USER/$bench -H 'Content-Type: application/json' --data ${BENCHMARK_PAYLOADS["$bench"]}
+    curl -s -X POST $LAMBDA_MANAGER_HOST:$LAMBDA_MANAGER_PORT/$USER/$bench -H 'Content-Type: application/json' --data "${BENCHMARK_PAYLOADS["$bench"]}"
 }
 
 function benchmark {

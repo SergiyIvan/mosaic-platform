@@ -1,5 +1,7 @@
 #!/bin/bash
 
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+
 print_and_die() {
     echo -e "$1" >&2
     exit 1
@@ -14,24 +16,19 @@ Usage: [--config /path/to/config.json] [--variables /path/to/variables.json] [--
 USAGE_END
 )
 
-if [[ -z "${ARGO_HOME}" ]]; then
-    echo "ARGO_HOME is not defined. Exiting..."
-    exit 1
-fi
-
 if [[ -z "${JAVA_HOME}" ]]; then
     echo "JAVA_HOME is not defined. Exiting..."
     exit 1
 fi
 
-cd "$ARGO_HOME/lambda-manager" || {
+cd "$DIR" || {
     echo "Redirection fails!"
     exit 1
 }
 
 # Initialize parameters with default values or leave empty.
-CONFIG_PATH="$ARGO_HOME/run/configs/manager/default-lambda-manager.json"
-VARIABLES_PATH="$ARGO_HOME/run/configs/manager/default-variables.json"
+CONFIG_PATH="$DIR/tests/multifunc/config.json"
+VARIABLES_PATH="$DIR/tests/multifunc/variables.json"
 SOCKET_SERVER_OPTION=
 HTTP_SERVER_OPTION=
 

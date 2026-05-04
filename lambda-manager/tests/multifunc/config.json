@@ -6,7 +6,6 @@
   "healthCheck": 50,
   "lambdaPort": 8080,
   "lambdaType": "container",
-  "optimizationPipeline": false,
   "lambdaConsole": true,
   "managerConsole": {
     "turnOn": true,
@@ -14,14 +13,7 @@
     "fineGrain": true
   },
   "lambdaPool": {
-    "hotspotWithAgent": 0,
-    "hotspot": 0,
-    "hydra": 5,
-    "graalos": 0,
-    "customJava": 10,
-    "customJavaScript": 10,
-    "customPython": 10,
-    "hydraPgo": 0,
-    "hydraPgoOptimized": 0
+    "mosaic": 0,
+    "native": 0
   }
 }

@@ -44,7 +44,7 @@ public class LambdaManagerController {
                                          @QueryValue("function_memory") String functionMemory,
                                          @QueryValue("function_code_url") String functionCodeUrl,
                                          @Nullable @QueryValue("function_runtime") String functionRuntime,
-                                         @Nullable @Body byte[] functionMetadata) {
+                                         @Body byte[] functionMetadata) {
         return LambdaManager.uploadFunction(username, functionName, functionMemory,
                 functionRuntime, functionCodeUrl, functionMetadata);
     }

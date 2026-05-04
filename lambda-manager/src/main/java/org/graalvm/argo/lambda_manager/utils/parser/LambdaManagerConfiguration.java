@@ -15,7 +15,6 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
                 "healthCheck",
                 "lambdaPort",
                 "lambdaType",
-                "optimizationPipeline",
                 "lambdaConsole",
                 "managerConsole",
                 "lambdaPool"
@@ -28,7 +27,6 @@ public class LambdaManagerConfiguration implements Serializable {
     @JsonProperty("healthCheck") private int healthCheck;
     @JsonProperty("lambdaPort") private int lambdaPort;
     @JsonProperty("lambdaType") private String lambdaType;
-    @JsonProperty("optimizationPipeline") private boolean optimizationPipeline;
     @JsonProperty("lambdaConsole") private boolean lambdaConsole;
     @JsonProperty("managerConsole") private LambdaManagerConsole lambdaManagerConsole;
     @JsonProperty("lambdaPool") private LambdaManagerPool lambdaPool;
@@ -45,19 +43,18 @@ public class LambdaManagerConfiguration implements Serializable {
      *
      * @param gateway - The default PC's gateway address.
      * @param maxMemory - Maximum memory that can be used by lambdas in total (MBs).
-     * @param maxTaps- Maximum number of taps available for lambdas.
+     * @param maxTaps - Maximum number of taps available for lambdas.
      * @param timeout - Time during which lambda can stay inactive (in seconds).
      * @param healthCheck - Lambda's health will be checked in this time-span, after the first
      *            health response, no more checks are made.
      * @param lambdaPort - In which port the lambda will receive its requests.
      * @param lambdaType - Type of the workers. Accepted values: [container,vm_firecracker].
-     * @param optimizationPipeline - enable or disable the CloudJIT optimization pipeline.
      * @param lambdaConsole - Is console active during qemu's run.
      * @param lambdaManagerConsole - The class with information about manager logging.
      * @param lambdaPool - The class that describes the pool of lambdas to be used.
      */
     public LambdaManagerConfiguration(String gateway, int maxMemory, int maxTaps, int timeout, int healthCheck, int lambdaPort, String lambdaType,
-                    boolean optimizationPipeline, boolean lambdaConsole, LambdaManagerConsole lambdaManagerConsole, LambdaManagerPool lambdaPool) {
+                    boolean lambdaConsole, LambdaManagerConsole lambdaManagerConsole, LambdaManagerPool lambdaPool) {
         super();
         this.gateway = gateway;
         this.maxMemory = maxMemory;
@@ -66,7 +63,6 @@ public class LambdaManagerConfiguration implements Serializable {
         this.healthCheck = healthCheck;
         this.lambdaPort = lambdaPort;
         this.lambdaType = lambdaType;
-        this.optimizationPipeline = optimizationPipeline;
         this.lambdaConsole = lambdaConsole;
         this.lambdaManagerConsole = lambdaManagerConsole;
         this.lambdaPool = lambdaPool;
@@ -140,16 +136,6 @@ public class LambdaManagerConfiguration implements Serializable {
     @JsonProperty("lambdaType")
     public void setLambdaType(String lambdaType) {
         this.lambdaType = lambdaType;
-    }
-
-    @JsonProperty("optimizationPipeline")
-    public boolean isOptimizationPipeline() {
-        return optimizationPipeline;
-    }
-
-    @JsonProperty("optimizationPipeline")
-    public void setOptimizationPipeline(boolean optimizationPipeline) {
-        this.optimizationPipeline = optimizationPipeline;
     }
 
     @JsonProperty("lambdaConsole")
