@@ -10,6 +10,13 @@ function build_container_image {
     cd "$DIR"
 }
 
+read -p "Builder container (y or Y, everything else as no)? " -n 1 -r
+echo    # move to a new line
+if [[ $REPLY =~ ^[Yy]$ ]]
+then
+    build_container_image builder
+fi
+
 read -p "Mosaic container (y or Y, everything else as no)? " -n 1 -r
 echo    # move to a new line
 if [[ $REPLY =~ ^[Yy]$ ]]

@@ -59,7 +59,7 @@ for bench in "${BASE_BENCHMARKS[@]}"; do
             payload='{"url": "'$DATA_ADDRESS'/template.html", "username": "rbruno", "random_len": 1000000}'
             ;;
         video-processing)
-            payload='{"video_url": "'$DATA_ADDRESS'/video.mp4", "watermark_url": "'$DATA_ADDRESS'/watermark.png", "ffmpeg_path": "'$DATA_ADDRESS'/ffmpeg"}'
+            payload='{"video_url": "'$DATA_ADDRESS'/video.mp4", "watermark_url": "'$DATA_ADDRESS'/watermark.png", "ffmpeg_url": "'$DATA_ADDRESS'/ffmpeg"}'
             ;;
         classify)
             payload='{"model_url": "'$DATA_ADDRESS'/resnet50.onnx", "image_url": "'$DATA_ADDRESS'/eagle.jpg", "labels_url": "'$DATA_ADDRESS'/resnet_labels.txt"}'
