@@ -1,8 +1,8 @@
 {
   "gateway": "172.18.0.1/16",
   "maxMemory": 2048,
-  "maxTaps": 100,
-  "timeout": 5000,
+  "maxTaps": 2,
+  "timeout": 5,
   "healthCheck": 50,
   "lambdaPort": 8080,
   "lambdaType": "container",

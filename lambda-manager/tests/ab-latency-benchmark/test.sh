@@ -25,8 +25,9 @@ function run_latency_benchmark {
     echo " RUNNING MOSAIC BENCHMARKS"
     echo "=========================================="
     for bench in "${MO_BENCHMARKS[@]}"; do
-        register $bench
-        benchmark $bench
+        register "$bench"
+        benchmark "$bench"
+        sleep 10
     done
 
     echo "=========================================="
@@ -35,6 +36,7 @@ function run_latency_benchmark {
     for bench in "${NA_NA_BENCHMARKS[@]}"; do
         register "$bench"
         benchmark "$bench"
+        sleep 10
     done
 
     echo "=========================================="
@@ -43,6 +45,7 @@ function run_latency_benchmark {
     for bench in "${NA_DE_BENCHMARKS[@]}"; do
         register "$bench"
         benchmark "$bench"
+        sleep 10
     done
 
     unset CONCURRENCY
