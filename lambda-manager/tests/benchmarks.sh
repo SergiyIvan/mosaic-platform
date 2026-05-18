@@ -6,10 +6,12 @@ DATA_ADDRESS="http://$DATA_IP:$DATA_PORT"
 
 BASE_BENCHMARKS=(bfs mst pagerank uploader compression dna thumbnailer dynamic-html video-processing classify)
 
-NA_BENCHMARKS=()
+NA_NA_BENCHMARKS=()
+NA_DE_BENCHMARKS=()
 MO_BENCHMARKS=()
 for bench in "${BASE_BENCHMARKS[@]}"; do
-    NA_BENCHMARKS+=("na_$bench")
+    NA_NA_BENCHMARKS+=("na_na_$bench")
+    NA_DE_BENCHMARKS+=("na_de_$bench")
     MO_BENCHMARKS+=("mo_$bench")
 done
 
@@ -29,44 +31,58 @@ for bench in "${BASE_BENCHMARKS[@]}"; do
     bench_underscores="${bench//-/_}"
 
     # Native configuration.
-    BENCHMARK_CODE["na_$bench"]="$DATA_ADDRESS/apps/native/native/lib$bench_underscores.so"
-    BENCHMARK_METADATA["na_$bench"]='{}'
+    BENCHMARK_CODE["na_na_$bench"]="$DATA_ADDRESS/apps/native/native/lib$bench_underscores.so"
+    BENCHMARK_METADATA["na_na_$bench"]='{}'
+    BENCHMARK_CODE["na_de_$bench"]="$DATA_ADDRESS/apps/native/default/lib$bench_underscores.so"
+    BENCHMARK_METADATA["na_de_$bench"]='{}'
 
     # Mosaic configuration.
     BENCHMARK_CODE["mo_$bench"]="$DATA_ADDRESS/apps/wasm/$bench_underscores.wasm"
 
-    # Payloads (same for native and Mosaic).
-    case $bench in
-        bfs|mst)
-            payload='{"size": 100000, "m": 10}'
-            ;;
-        pagerank)
-            payload='{"size": 10000, "m": 10, "iterations": 20}'
-            ;;
-        uploader)
-            payload='{"download_url": "'$DATA_ADDRESS'/video.mp4", "upload_url": "http://172.18.0.1:9696/upload"}'
-            ;;
-        compression)
-            payload='{"input_url": "'$DATA_ADDRESS'/video.mp4"}'
-            ;;
-        dna)
-            payload='{"url": "'$DATA_ADDRESS'/bacillus_subtilis.fasta"}'
-            ;;
-        thumbnailer)
-            payload='{"url": "'$DATA_ADDRESS'/snap.png", "target_width": 200, "target_height": 200}'
-            ;;
-        dynamic-html)
-            payload='{"url": "'$DATA_ADDRESS'/template.html", "username": "rbruno", "random_len": 1000000}'
-            ;;
-        video-processing)
-            payload='{"video_url": "'$DATA_ADDRESS'/video.mp4", "watermark_url": "'$DATA_ADDRESS'/watermark.png", "ffmpeg_url": "'$DATA_ADDRESS'/ffmpeg"}'
-            ;;
-        classify)
-            payload='{"model_url": "'$DATA_ADDRESS'/resnet50.onnx", "image_url": "'$DATA_ADDRESS'/eagle.jpg", "labels_url": "'$DATA_ADDRESS'/resnet_labels.txt"}'
-            ;;
-    esac
-    BENCHMARK_PAYLOADS["na_$bench"]=$payload
-    BENCHMARK_PAYLOADS["mo_$bench"]=$payload
+    # Payloads.
+    for prefix in "na_na" "na_de" "mo"; do
+        full_bench="${prefix}_${bench}"
+
+        # Determine FFmpeg binary based on mode.
+        if [[ "$prefix" == "mo" || "$prefix" == "na_na" ]]; then
+            FFMPEG_URL="$DATA_ADDRESS/ffmpeg_optimized"
+        else
+            FFMPEG_URL="$DATA_ADDRESS/ffmpeg"
+        fi
+
+
+        case $bench in
+            bfs|mst)
+                payload='{"size": 100000, "m": 10}'
+                ;;
+            pagerank)
+                payload='{"size": 10000, "m": 10, "iterations": 20}'
+                ;;
+            uploader)
+                payload='{"download_url": "'$DATA_ADDRESS'/video.mp4", "upload_url": "http://172.18.0.1:9696/upload"}'
+                ;;
+            compression)
+                payload='{"input_url": "'$DATA_ADDRESS'/video.mp4"}'
+                ;;
+            dna)
+                payload='{"url": "'$DATA_ADDRESS'/bacillus_subtilis.fasta"}'
+                ;;
+            thumbnailer)
+                payload='{"url": "'$DATA_ADDRESS'/snap.png", "target_width": 200, "target_height": 200}'
+                ;;
+            dynamic-html)
+                payload='{"url": "'$DATA_ADDRESS'/template.html", "username": "rbruno", "random_len": 1000000}'
+                ;;
+            video-processing)
+                payload='{"video_url": "'$DATA_ADDRESS'/video.mp4", "watermark_url": "'$DATA_ADDRESS'/watermark.png", "ffmpeg_url": "'$FFMPEG_URL'"}'
+                ;;
+            classify)
+                payload='{"model_url": "'$DATA_ADDRESS'/resnet50.onnx", "image_url": "'$DATA_ADDRESS'/eagle.jpg", "labels_url": "'$DATA_ADDRESS'/resnet_labels.txt"}'
+                ;;
+        esac
+
+        BENCHMARK_PAYLOADS["$full_bench"]=$payload
+    done
 done
 
 # Mosaic trampoline metadata.

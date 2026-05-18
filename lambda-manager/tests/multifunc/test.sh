@@ -13,7 +13,7 @@ source "$DIR/../shared.sh"
 
 function run_na_benchmarks {
     echo "=== Running Native Benchmarks ==="
-    for bench in "${NA_BENCHMARKS[@]}"; do
+    for bench in "${NA_NA_BENCHMARKS[@]}"; do
         register $bench
         request $bench
     done

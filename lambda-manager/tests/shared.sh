@@ -73,6 +73,14 @@ function benchmark {
     echo $payload > $app_post
     results_file=$RESULTS_DIR/"$USER-$bench.log"
 
+
+    if [ -n "$WARMUP" ]; then
+        echo -e "${GREEN}Warmup for $bench...${NC}"
+        warmup_results_file=$RESULTS_DIR/"warmup_$USER-$bench.log"
+        ab -p $app_post -T application/json -c $CONCURRENCY -n $WARMUP http://$LAMBDA_MANAGER_HOST:$LAMBDA_MANAGER_PORT/$USER/$bench &> $warmup_results_file
+        echo -e "${GREEN}Warmup finished!${NC}"
+    fi
+
     echo -e "${GREEN}Benchmarking $bench...${NC}"
     ab -p $app_post -T application/json -c $CONCURRENCY -n $WORKLOAD http://$LAMBDA_MANAGER_HOST:$LAMBDA_MANAGER_PORT/$USER/$bench &> $results_file
 
