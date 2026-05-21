@@ -119,7 +119,7 @@ async fn run_handler(
     Json(GenericResponse { status: "success".to_string(), message: result_str.to_string() })
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     let state = Arc::new(Mutex::new(ProxyState { loaded_lib: None }));
 

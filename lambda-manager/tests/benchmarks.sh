@@ -56,7 +56,7 @@ for bench in "${BASE_BENCHMARKS[@]}"; do
                 payload='{"size": 100000, "m": 10}'
                 ;;
             pagerank)
-                payload='{"size": 10000, "m": 10, "iterations": 20}'
+                payload='{"size": 100000, "m": 10, "iterations": 20}'
                 ;;
             uploader)
                 payload='{"download_url": "'$DATA_ADDRESS'/video.mp4", "upload_url": "http://172.18.0.1:9696/upload"}'
@@ -68,7 +68,7 @@ for bench in "${BASE_BENCHMARKS[@]}"; do
                 payload='{"url": "'$DATA_ADDRESS'/bacillus_subtilis.fasta"}'
                 ;;
             thumbnailer)
-                payload='{"url": "'$DATA_ADDRESS'/snap.png", "target_width": 200, "target_height": 200}'
+                payload='{"url": "'$DATA_ADDRESS'/snap.png", "target_width": 800, "target_height": 800}'
                 ;;
             dynamic-html)
                 payload='{"url": "'$DATA_ADDRESS'/template.html", "username": "rbruno", "random_len": 1000000}'

@@ -213,7 +213,7 @@ async fn run_handler(
 }
 
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     let engine = Engine::default();
 
