@@ -65,6 +65,7 @@ docker run --rm --name="$LAMBDA_NAME" \
   ${TAGS[@]} \
   -p "$LAMBDA_PORT":"$PROXY_PORT" \
   $CONTAINER_SIZE_OPTIONS \
+  --cpuset-cpus="0" \
   "$CONTAINER_IMAGE" &
 
 # Writes PID of the init process.

@@ -24,7 +24,7 @@ function register {
     bench=$1
 
     if [ -z "$FUNCTION_MEMORY" ]; then
-        FUNCTION_MEMORY=512
+        FUNCTION_MEMORY=2048
     fi
 
     runtime=
