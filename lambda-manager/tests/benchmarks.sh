@@ -59,25 +59,25 @@ for bench in "${BASE_BENCHMARKS[@]}"; do
                 payload='{"size": 100000, "m": 10, "iterations": 20}'
                 ;;
             uploader)
-                payload='{"download_url": "'$DATA_ADDRESS'/video.mp4", "upload_url": "http://172.18.0.1:9696/upload"}'
+                payload='{"download_url": "'$DATA_ADDRESS'/video.mp4", "upload_url": "http://172.18.0.1:9696/upload", "file_size": 1600000}'
                 ;;
             compression)
-                payload='{"input_url": "'$DATA_ADDRESS'/video.mp4"}'
+                payload='{"input_url": "'$DATA_ADDRESS'/video.mp4", "input_size": 1600000}'
                 ;;
             dna)
-                payload='{"url": "'$DATA_ADDRESS'/bacillus_subtilis.fasta"}'
+                payload='{"url": "'$DATA_ADDRESS'/bacillus_subtilis.fasta", "fasta_size": 4500000, "json_size": 158000000}'
                 ;;
             thumbnailer)
-                payload='{"url": "'$DATA_ADDRESS'/snap.png", "target_width": 800, "target_height": 800}'
+                payload='{"url": "'$DATA_ADDRESS'/snap.png", "target_width": 200, "target_height": 200, "file_size": 50000}'
                 ;;
             dynamic-html)
-                payload='{"url": "'$DATA_ADDRESS'/template.html", "username": "rbruno", "random_len": 1000000}'
+                payload='{"url": "'$DATA_ADDRESS'/template.html", "username": "rbruno", "random_len": 1000000, "template_size": 1024, "html_size": 33000000}'
                 ;;
             video-processing)
                 payload='{"video_url": "'$DATA_ADDRESS'/video.mp4", "watermark_url": "'$DATA_ADDRESS'/watermark.png", "ffmpeg_url": "'$FFMPEG_URL'"}'
                 ;;
             classify)
-                payload='{"model_url": "'$DATA_ADDRESS'/resnet50.onnx", "image_url": "'$DATA_ADDRESS'/eagle.jpg", "labels_url": "'$DATA_ADDRESS'/resnet_labels.txt"}'
+                payload='{"model_url": "'$DATA_ADDRESS'/resnet50.onnx", "image_url": "'$DATA_ADDRESS'/eagle.jpg", "labels_url": "'$DATA_ADDRESS'/resnet_labels.txt", "model_file_size": 104857600, "image_file_size": 6000, "labels_file_size": 11000}'
                 ;;
         esac
 

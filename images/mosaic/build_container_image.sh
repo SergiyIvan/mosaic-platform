@@ -2,7 +2,12 @@
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
-PROXY_DIR="$DIR/../../proxies/mosaic-proxy"
+TIME_SPANS_PATH_SUFFIX=""
+if [ -n "$TIME_SPANS" ]; then
+    TIME_SPANS_PATH_SUFFIX="-time-spans"
+fi
+
+PROXY_DIR="$DIR/../../proxies/mosaic-proxy$TIME_SPANS_PATH_SUFFIX"
 DISK="$DIR/disk"
 
 echo "Building mosaic-proxy..."
