@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::fs::File;
 use std::io::Write;
 use libloading::{Library, Symbol};
-use wasmtime::{Engine, Module, Store, Linker, FuncType, ValType, Val, InstancePre};
+use wasmtime::{Engine, Module, Store, Linker, FuncType, ValType, Val};
 use wasmtime_wasi::preview1::{self, WasiP1Ctx};
 use wasmtime_wasi::p2::WasiCtxBuilder;
 
@@ -17,7 +17,8 @@ type TrampolineDispatch = unsafe extern "C" fn(
 struct ProxyState {
     engine: Engine,
     loaded_libs: Vec<Arc<Library>>,
-    instance_pre: Option<InstancePre<ProxyModuleState>>,
+    wasm_module: Option<Module>,
+    linker: Option<Linker<ProxyModuleState>>,
 }
 
 #[derive(Deserialize)]
@@ -151,10 +152,9 @@ async fn init_handler(
         loaded_libs.push(lib);
     }
 
-    let instance_pre = linker.instantiate_pre(&module).unwrap();
-
     state_lock.loaded_libs = loaded_libs;
-    state_lock.instance_pre = Some(instance_pre);
+    state_lock.wasm_module = Some(module);
+    state_lock.linker = Some(linker);
 
     Json(GenericResponse { status: "success".into(), message: "Functions registered and loaded successfully.".into() })
 }
@@ -169,11 +169,13 @@ async fn run_handler(
 
     let state_lock = state.lock().unwrap();
 
-    if state_lock.instance_pre.is_none() {
+    if state_lock.wasm_module.is_none() {
         return Json(GenericResponse { status: "error".into(), message: "No function initialized.".into() });
     }
 
     let engine = &state_lock.engine;
+    let module = state_lock.wasm_module.as_ref().unwrap();
+    let linker = state_lock.linker.as_ref().unwrap();
 
     // ---> START INSTANTIATION SPAN
     let start_init = std::time::Instant::now();
@@ -182,8 +184,7 @@ async fn run_handler(
     let mut store = Store::new(engine, ProxyModuleState { wasi });
 
     // Instantiate the module.
-    let instance_pre = state_lock.instance_pre.as_ref().unwrap();
-    let instance = match instance_pre.instantiate(&mut store) {
+    let instance = match linker.instantiate(&mut store, module) {
         Ok(i) => i,
         Err(e) => return Json(GenericResponse { status: "error".into(), message: e.to_string() }),
     };
@@ -239,7 +240,8 @@ async fn main() {
     let state = Arc::new(Mutex::new(ProxyState {
         engine,
         loaded_libs: Vec::new(),
-        instance_pre: None,
+        wasm_module: None,
+        linker: None,
     }));
 
     let app = Router::new()

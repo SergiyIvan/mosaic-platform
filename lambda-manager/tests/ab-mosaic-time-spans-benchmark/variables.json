@@ -1,0 +1,11 @@
+{
+    "firstLambdaPort": 30100,
+
+    "faultTolerance": 10,
+    "lambdaFaultTolerance": 1,
+
+    "reclamationInterval": 5000,
+    "lruReclamationPeriod": 5000,
+    "reclamationThreshold": 0.3,
+    "reclamationPercentage": 0.15
+}
