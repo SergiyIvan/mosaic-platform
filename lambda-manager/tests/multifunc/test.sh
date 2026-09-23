@@ -3,7 +3,7 @@
 # This is a smoke-test for Lambda Manager and Mosaic/native runtimes.
 # It uploads functions with different runtimes and performs a single invocation to every registered function.
 # The functions in this script are the typical functions from the benchmark suite we use for evaluation.
-# NOTE: this script requires the "web" and "upload" containers to be started (see mosaic-system/data/start-webserver.sh).
+# NOTE: this script requires the "web" and "upload" containers to be started (see mosaic/data/start-webserver.sh).
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 
