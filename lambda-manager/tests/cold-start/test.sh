@@ -26,13 +26,13 @@ UBER_SO_URL="$DATA_ADDRESS/apps/native/native/lib${BENCH_UNDERSCORE}.so"
 
 # 3. XaaS Repository Paths (assumed from repository structures provided)
 # Dynamically locate repository root
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/../system"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/../"
 # Adjust this path if your benchmark workspace directory differs
 BENCH_REL_PATH="core-modules/native/$BENCH_NAME"
 
 # Prepare output CSV file
 echo "iteration,mode,latency_ms" > "$OUTPUT_FILE"
-rm "$LAMBDA_LOG"
+rm -f "$LAMBDA_LOG"
 
 # Helper function to poll port availability cleanly
 wait_for_port() {
